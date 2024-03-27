@@ -2,15 +2,16 @@
 #include <ArtnetWifi.h>
 #include <FastLED.h>
 
+#include <cstdint>
+
 #include "fast_led_sk6812.hpp"
+#include "led_programm.hpp"
 #include "wifi_credentials.hpp"
 
 const int number_leds = 144;
 const int matrix_width = 36;
 const int matrix_height = 4;
-const int matrix_rows = 2;
-const int matrix_collums = 2;
-const int number_channels = 4 * matrix_rows * matrix_collums;
+const int number_channels = 19;
 
 const byte data_pin = 0;
 
@@ -19,8 +20,13 @@ CRGB* leds_rgb = (CRGB*)&leds[0];
 
 ArtnetWifi artnet;
 
-const int start_universe = 0;
+LEDProgram* current_program = nullptr;
+uint8_t current_program_number = -1;
+LEDProgram* programs[] = {new ConsoleLogProgram(), new AllLEDsOnProgram()};
+const int number_programs = sizeof(programs) / sizeof(programs[0]);
 
+const int start_universe = 0;
+const int start_channel = 0;
 const int max_universe =
     number_channels / 512 + ((number_channels % 512) ? 1 : 0);
 bool universes_received[max_universe];
@@ -48,8 +54,8 @@ bool connect_wifi(char* wlan_ssid, char* wlan_password) {
   /**
    * Connect to a WiFi network.
    *
-   * Tries to connect to the specified WiFi network using the provided SSID and
-   * password. Continuously attempts to connect until a connection is
+   * Tries to connect to the specified WiFi network using the provided SSID
+   * and password. Continuously attempts to connect until a connection is
    * established or the attempt limit is reached.
    *
    * Args:
@@ -92,32 +98,35 @@ bool connect_wifi(char* wlan_ssid, char* wlan_password) {
 void init_test() {
   /**
    * Initializes and tests the LED strip by lighting up LEDs in red, green,
-   * blue, and then turning them off. Each color is displayed for half a second.
+   * blue, and then turning them off. Each color is displayed for half a
+   * second.
    */
+  Serial.println("Starting LED test...");
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(127, 0, 0, 0);
   }
   FastLED.show();
-  delay(500);
+  delay(100);
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(0, 127, 0, 0);
   }
   FastLED.show();
-  delay(500);
+  delay(100);
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(0, 0, 127, 0);
   }
   FastLED.show();
-  delay(500);
+  delay(100);
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(0, 0, 0, 127);
   }
   FastLED.show();
-  delay(500);
+  delay(100);
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(0, 0, 0, 0);
   }
   FastLED.show();
+  Serial.println("LED test completed.");
 }
 
 void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
@@ -127,17 +136,18 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
    * received.
    *
    * This function is called upon receiving a DMX frame, adjusting LED
-   * brightness if the frame is from a specific universe (e.g., 15) and setting
-   * LED colors based on the data provided. It ensures that all expected
-   * universes have been received before updating the LEDs. The function assumes
-   * a global setup for universes_received and leds arrays, which track received
-   * universes and store LED states, respectively.
+   * brightness if the frame is from a specific universe (e.g., 15) and
+   * setting LED colors based on the data provided. It ensures that all
+   * expected universes have been received before updating the LEDs. The
+   * function assumes a global setup for universes_received and leds arrays,
+   * which track received universes and store LED states, respectively.
    *
    * Args:
-   * - universe (int): The DMX universe from which the frame was received. Used
-   * to determine action and whether to process or ignore the frame.
-   * - length (int): The length of the DMX data array. Not directly used in this
-   * function, but included for compatibility with typical DMX frame handlers.
+   * - universe (int): The DMX universe from which the frame was received.
+   * Used to determine action and whether to process or ignore the frame.
+   * - length (int): The length of the DMX data array. Not directly used in
+   * this function, but included for compatibility with typical DMX frame
+   * handlers.
    * - sequence (int): The sequence number of the DMX frame. Not directly used
    * in this function, but useful for debugging or advanced control logic.
    * - data (list of int or bytearray): The DMX data for the universe. This
@@ -145,47 +155,54 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
    * controlled via DMX.
    *
    * Returns:
-   * - None. LED updates are performed within the function based on the received
-   * DMX frame data, with no return value.
+   * - None. LED updates are performed within the function based on the
+   * received DMX frame data, with no return value.
    */
-  send_frame = 1;
-  if (universe == 15) {
-    FastLED.setBrightness(data[0]);
-    FastLED.show();
-  }
+  int offset = start_channel;
 
-  if (universe < start_universe) {
+  Serial.print("DMX Frame received: Universe ");
+  Serial.print(universe);
+  Serial.print(", Length ");
+  Serial.println(length);
+
+  if (length < (start_channel + 19)) {
+    Serial.println("Data length too short, ignoring frame.");
     return;
   }
-  uint8_t index = universe - start_universe;
-  if (index >= max_universe) {
-    return;
-  }
 
-  universes_received[index] = true;
+  uint8_t program_selector = data[start_channel];
+  Serial.print("Program Selector: ");
+  Serial.println(program_selector);
 
-  for (int i = 0; i < max_universe; i++) {
-    if (!universes_received[i]) {
-      send_frame = 0;
-      break;
+  if (current_program == nullptr ||
+      current_program_number != program_selector) {
+    if (program_selector >= 0 && program_selector < number_programs) {
+      current_program = programs[program_selector];
+      current_program->initialize(matrix_width, matrix_height);
+      current_program_number = program_selector;
+      Serial.println("Program initialized.");
+    } else {
+      Serial.println("Invalid program selector, ignoring frame.");
+      return;
     }
   }
 
-  Serial.println("Frame!");
-  Serial.print("universe: ");
-  Serial.println(universe);
-  Serial.print("data: ");
-  Serial.println(data[4]);
+  Serial.println("Updating program with new data.");
 
-  for (int led = 0; led < number_leds; led++) {
-    int i = 0;
-    leds[led] =
-        CRGBW(data[i * 3], data[i * 3 + 1], data[i * 3 + 2], data[i * 3 + 3]);
-  }
-  FastLED.show();
+  if (current_program != nullptr) {
+    CRGBW color_1(data[offset + 1], data[offset + 2], data[offset + 3],
+                  data[offset + 4]);
+    CRGBW color_2(data[offset + 5], data[offset + 6], data[offset + 7],
+                  data[offset + 8]);
+    CRGBW color_3(data[offset + 9], data[offset + 10], data[offset + 11],
+                  data[offset + 12]);
+    CRGBW color_4(data[offset + 13], data[offset + 14], data[offset + 15],
+                  data[offset + 16]);
+    uint8_t value_1 = data[offset + 17];
+    uint8_t value_2 = data[offset + 18];
 
-  if (send_frame) {
+    current_program->update(leds, &color_1, &color_2, &color_3, &color_4,
+                            value_1, value_2);
     FastLED.show();
-    memset(universes_received, 0, max_universe);
   }
 }
