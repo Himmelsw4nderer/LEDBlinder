@@ -5,7 +5,10 @@
 #include <cstdint>
 
 #include "fast_led_sk6812.hpp"
-#include "led_programm.hpp"
+#include "programs/all_leds_on_program.hpp"
+#include "programs/console_log_program.hpp"
+#include "programs/led_program.hpp"
+#include "programs/strobe_program.hpp"
 #include "wifi_credentials.hpp"
 
 const int number_leds = 144;
@@ -22,7 +25,8 @@ ArtnetWifi artnet;
 
 LEDProgram* current_program = nullptr;
 uint8_t current_program_number = -1;
-LEDProgram* programs[] = {new ConsoleLogProgram(), new AllLEDsOnProgram()};
+LEDProgram* programs[] = {new ConsoleLogProgram(), new AllLEDsOnProgram(),
+                          new StrobeProgram()};
 const int number_programs = sizeof(programs) / sizeof(programs[0]);
 
 const int start_universe = 0;

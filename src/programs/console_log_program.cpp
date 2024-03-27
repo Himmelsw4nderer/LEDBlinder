@@ -1,12 +1,4 @@
-#include "led_programm.hpp"
-
-void AllLEDsOnProgram::update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2,
-                              CRGBW* color_3, CRGBW* color_4, uint8_t value_1,
-                              uint8_t value_2) {
-  for (int i = 0; i < this->matrix_width * this->matrix_height; i++) {
-    leds[i] = *color_1;
-  }
-}
+#include "console_log_program.hpp"
 
 void ConsoleLogProgram::update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2,
                                CRGBW* color_3, CRGBW* color_4, uint8_t value_1,
@@ -46,7 +38,6 @@ void ConsoleLogProgram::update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2,
   Serial.print(", W=");
   Serial.println(color_4->w);
 
-  // Log the additional values
   Serial.print("Value 1: ");
   Serial.println(value_1);
   Serial.print("Value 2: ");
