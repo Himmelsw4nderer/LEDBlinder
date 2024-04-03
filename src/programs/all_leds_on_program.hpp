@@ -35,6 +35,5 @@ class AllLEDsOnProgram : public LEDProgram {
    * @param value_2 Another generic value for additional effect tuning or
    * control. Ignored in this implementation.
    */
-  void update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2, CRGBW* color_3,
-              CRGBW* color_4, uint8_t value_1, uint8_t value_2) override;
+  void update(CRGBW* leds) override;
 };

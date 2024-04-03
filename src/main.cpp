@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "fast_led_sk6812.hpp"
+#include "led_data.hpp"
 #include "programs/all_leds_on_program.hpp"
 #include "programs/console_log_program.hpp"
 #include "programs/led_program.hpp"
@@ -37,15 +38,6 @@ const int max_universe =
 bool universes_received[max_universe];
 bool send_frame = 1;
 
-struct LedData {
-  CRGBW color_1;
-  CRGBW color_2;
-  CRGBW color_3;
-  CRGBW color_4;
-  uint8_t value_1;
-  uint8_t value_2;
-};
-
 QueueHandle_t ledDataQueue;
 
 bool connect_wifi(char* wlan_ssid, char* wlan_password);
@@ -63,11 +55,6 @@ void setup() {
 
   memset(universes_received, 0, max_universe);
   artnet.setArtDmxCallback(on_dmx_frame);
-
-  ledDataQueue = xQueueCreate(1, sizeof(LedData));  // Queue für 10 Nachrichten
-  if (ledDataQueue == NULL) {
-    Serial.println("Failed to create the queue");
-  }
 
   xTaskCreate(updateTask,        /* Task-Funktion */
               "Update LED Task", /* Name des Tasks */
@@ -210,39 +197,29 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
   }
 
   if (current_program != nullptr) {
-    LedData msg;
-    LedData dummyData;
-    msg.color_1 = CRGBW(data[offset + 1], data[offset + 2], data[offset + 3],
-                        data[offset + 4]);
-    msg.color_2 = CRGBW(data[offset + 5], data[offset + 6], data[offset + 7],
-                        data[offset + 8]);
-    msg.color_3 = CRGBW(data[offset + 9], data[offset + 10], data[offset + 11],
-                        data[offset + 12]);
-    msg.color_4 = CRGBW(data[offset + 13], data[offset + 14], data[offset + 15],
-                        data[offset + 16]);
-    msg.value_1 = data[offset + 17];
-    msg.value_2 = data[offset + 18];
+    LedData led_data;
+    led_data.color_1 = CRGBW(data[offset + 1], data[offset + 2],
+                             data[offset + 3], data[offset + 4]);
+    led_data.color_2 = CRGBW(data[offset + 5], data[offset + 6],
+                             data[offset + 7], data[offset + 8]);
+    led_data.color_3 = CRGBW(data[offset + 9], data[offset + 10],
+                             data[offset + 11], data[offset + 12]);
+    led_data.color_4 = CRGBW(data[offset + 13], data[offset + 14],
+                             data[offset + 15], data[offset + 16]);
+    led_data.value_1 = data[offset + 17];
+    led_data.value_2 = data[offset + 18];
 
-    xQueueReceive(ledDataQueue, &dummyData, (TickType_t)0);
-    if (xQueueSend(ledDataQueue, &msg, portMAX_DELAY) != pdPASS) {
-      Serial.println("Failed to send to the queue");
-    }
-
-    // current_program->update(leds, &color_1, &color_2, &color_3, &color_4,
-    //                         value_1, value_2);
+    current_program->set(leds, &led_data);
     FastLED.show();
   }
 }
 
 void updateTask(void* pvParameters) {
-  LedData msg;
   for (;;) {
-    xQueueReceive(ledDataQueue, &msg, portMAX_DELAY);
-    if (current_program != nullptr) {
-      current_program->update(leds, &msg.color_1, &msg.color_2, &msg.color_3,
-                              &msg.color_4, msg.value_1, msg.value_2);
-      Serial.println(millis());
-      // vTaskDelay(pdMS_TO_TICKS(20));
-    }
+    // if (current_program != nullptr) {
+    current_program->update(leds);
+    Serial.println(millis());
+    vTaskDelay(pdMS_TO_TICKS(20));
+    //}
   }
 }

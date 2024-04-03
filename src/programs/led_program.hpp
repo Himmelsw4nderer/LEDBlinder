@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "fast_led_sk6812.hpp"
+#include "led_data.hpp"
 
 /**
  * @brief Abstract base class representing a generic LED program.
@@ -38,21 +39,24 @@ class LEDProgram {
    *
    * @param leds Pointer to the array of CRGBW structs representing each LED's
    * color.
-   * @param color_1 Primary color used by the program (e.g., for primary
-   * effects).
-   * @param color_2 Secondary color used by the program (e.g., for accents).
-   * @param color_3 Tertiary color used by the program (optional usage).
-   * @param color_4 Quaternary color used by the program (optional usage).
-   * @param value_1 A generic value that can be used by the program for effect
-   * tuning.
-   * @param value_2 Another generic value for additional effect tuning or
-   * control.
    */
-  virtual void update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2,
-                      CRGBW* color_3, CRGBW* color_4, uint8_t value_1,
-                      uint8_t value_2) = 0;
+  virtual void update(CRGBW* leds) = 0;
+
+  /**
+   * @brief Updates the LED matrix based on program logic.
+   *
+   * Derived classes must implement this method to define the program's
+   * behavior. This typically involves setting LED colors based on the program's
+   * state.
+   *
+   * @param leds Pointer to the array of CRGBW structs representing each LED's
+   * color.
+   * @param data The data containing colors and values
+   */
+  void set(CRGBW* leds, LedData* data) { this->data = data; };
 
  protected:
   int matrix_width;
   int matrix_height;
+  LedData* data;
 };
