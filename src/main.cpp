@@ -73,7 +73,7 @@ void setup() {
               "Update LED Task", /* Name des Tasks */
               10000,             /* Stack-Größe in Wörtern */
               NULL,              /* Parameter für die Task-Funktion */
-              1,                 /* Priorität des Tasks */
+              0,                 /* Priorität des Tasks */
               NULL               /* Task-Handle */
   );
 }
