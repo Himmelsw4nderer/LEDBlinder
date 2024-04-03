@@ -16,7 +16,10 @@ void StrobeProgram::update(CRGBW* leds, CRGBW* color_1, CRGBW* color_2,
 
   isOn = !isOn;
 
-  for (int i = 0; i < this->matrix_width * this->matrix_height; i++) {
-    leds[i] = isOn ? *color_1 : *color_2;
+  CRGBW color = isOn ? *color_1 : *color_2;
+  uint matrix_amount = this->matrix_width * this->matrix_height;
+
+  for (int i = 0; i < matrix_amount; i++) {
+    leds[i] = color;
   }
 }
