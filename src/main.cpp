@@ -40,12 +40,70 @@ bool send_frame = 1;
 
 QueueHandle_t ledDataQueue;
 
+/**
+ * Connect to a WiFi network.
+ *
+ * Tries to connect to the specified WiFi network using the provided SSID
+ * and password. Continuously attempts to connect until a connection is
+ * established or the attempt limit is reached.
+ *
+ * Args:
+ *     wlan_ssid (str): The SSID of the WiFi network to connect to.
+ *     wlan_password (str): The password of the WiFi network.
+ *
+ * Returns:
+ *     bool: True if the connection was successful, False otherwise.
+ */
 bool connect_wifi(char* wlan_ssid, char* wlan_password);
+
+/**
+ * Initializes and tests the LED strip by lighting up LEDs in red, green,
+ * blue, and then turning them off. Each color is displayed for half a
+ * second.
+ */
 void init_test();
+
+/**
+ * Handles a DMX frame for LED control based on the universe and data
+ * received.
+ *
+ * This function is called upon receiving a DMX frame, adjusting LED
+ * brightness if the frame is from a specific universe (e.g., 15) and
+ * setting LED colors based on the data provided. It ensures that all
+ * expected universes have been received before updating the LEDs. The
+ * function assumes a global setup for universes_received and leds arrays,
+ * which track received universes and store LED states, respectively.
+ *
+ * Args:
+ * - universe (int): The DMX universe from which the frame was received.
+ * Used to determine action and whether to process or ignore the frame.
+ * - length (int): The length of the DMX data array. Not directly used in
+ * this function, but included for compatibility with typical DMX frame
+ * handlers.
+ * - sequence (int): The sequence number of the DMX frame. Not directly used
+ * in this function, but useful for debugging or advanced control logic.
+ * - data (list of int or bytearray): The DMX data for the universe. This
+ * array contains the actual control values for LEDs or other devices being
+ * controlled via DMX.
+ *
+ * Returns:
+ * - None. LED updates are performed within the function based on the
+ * received DMX frame data, with no return value.
+ */
 void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
                   uint8_t* data);
+
+/**
+ * The tasks that run and update the fast leds
+ *
+ * @param pvParameters
+ */
 void updateTask(void* pvParameters);
 
+/**
+ * The setup function that connects to everything and starts all loops
+ *
+ */
 void setup() {
   Serial.begin(115200);
   connect_wifi(WIFI_SSID, WIFI_PASSWORD);
@@ -65,23 +123,16 @@ void setup() {
   );
 }
 
-void loop() { artnet.read(); }
+/**
+ * @The standard Loop receiving artnet data
+ *
+ */
+void loop() {
+  artnet.read();
+  vTaskDelay(pdMS_TO_TICKS(20));
+}
 
 bool connect_wifi(char* wlan_ssid, char* wlan_password) {
-  /**
-   * Connect to a WiFi network.
-   *
-   * Tries to connect to the specified WiFi network using the provided SSID
-   * and password. Continuously attempts to connect until a connection is
-   * established or the attempt limit is reached.
-   *
-   * Args:
-   *     wlan_ssid (str): The SSID of the WiFi network to connect to.
-   *     wlan_password (str): The password of the WiFi network.
-   *
-   * Returns:
-   *     bool: True if the connection was successful, False otherwise.
-   */
   bool state = true;
   int i = 0;
 
@@ -113,11 +164,6 @@ bool connect_wifi(char* wlan_ssid, char* wlan_password) {
 }
 
 void init_test() {
-  /**
-   * Initializes and tests the LED strip by lighting up LEDs in red, green,
-   * blue, and then turning them off. Each color is displayed for half a
-   * second.
-   */
   Serial.println("Starting LED test...");
   for (int i = 0; i < number_leds; i++) {
     leds[i] = CRGBW(127, 0, 0, 0);
@@ -148,33 +194,6 @@ void init_test() {
 
 void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
                   uint8_t* data) {
-  /**
-   * Handles a DMX frame for LED control based on the universe and data
-   * received.
-   *
-   * This function is called upon receiving a DMX frame, adjusting LED
-   * brightness if the frame is from a specific universe (e.g., 15) and
-   * setting LED colors based on the data provided. It ensures that all
-   * expected universes have been received before updating the LEDs. The
-   * function assumes a global setup for universes_received and leds arrays,
-   * which track received universes and store LED states, respectively.
-   *
-   * Args:
-   * - universe (int): The DMX universe from which the frame was received.
-   * Used to determine action and whether to process or ignore the frame.
-   * - length (int): The length of the DMX data array. Not directly used in
-   * this function, but included for compatibility with typical DMX frame
-   * handlers.
-   * - sequence (int): The sequence number of the DMX frame. Not directly used
-   * in this function, but useful for debugging or advanced control logic.
-   * - data (list of int or bytearray): The DMX data for the universe. This
-   * array contains the actual control values for LEDs or other devices being
-   * controlled via DMX.
-   *
-   * Returns:
-   * - None. LED updates are performed within the function based on the
-   * received DMX frame data, with no return value.
-   */
   int offset = start_channel;
 
   if (length < (start_channel + 19)) {
@@ -211,14 +230,12 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
 
     current_program->set(leds, &led_data);
     FastLED.show();
-    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
 void updateTask(void* pvParameters) {
   for (;;) {
     current_program->update(leds);
-    Serial.println(millis());
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
