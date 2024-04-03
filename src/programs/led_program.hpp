@@ -53,7 +53,10 @@ class LEDProgram {
    * color.
    * @param data The data containing colors and values
    */
-  void set(CRGBW* leds, LedData* data) { this->data = data; };
+  void set(CRGBW* leds, LedData* data) {
+    this->data = data;
+    this->update(leds);
+  };
 
  protected:
   int matrix_width;

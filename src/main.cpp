@@ -60,7 +60,7 @@ void setup() {
               "Update LED Task", /* Name des Tasks */
               10000,             /* Stack-Größe in Wörtern */
               NULL,              /* Parameter für die Task-Funktion */
-              1,                 /* Priorität des Tasks */
+              0,                 /* Priorität des Tasks */
               NULL               /* Task-Handle */
   );
 }
@@ -211,15 +211,14 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
 
     current_program->set(leds, &led_data);
     FastLED.show();
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
 
 void updateTask(void* pvParameters) {
   for (;;) {
-    // if (current_program != nullptr) {
     current_program->update(leds);
     Serial.println(millis());
-    vTaskDelay(pdMS_TO_TICKS(20));
-    //}
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
