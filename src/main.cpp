@@ -37,10 +37,18 @@ const int max_universe =
 bool universes_received[max_universe];
 bool send_frame = 1;
 
+CRGBW color_1(0, 0, 0, 0);
+CRGBW color_2(0, 0, 0, 0);
+CRGBW color_3(0, 0, 0, 0);
+CRGBW color_4(0, 0, 0, 0);
+uint8_t value_1 = 0;
+uint8_t value_2 = 0;
+
 bool connect_wifi(char* wlan_ssid, char* wlan_password);
 void init_test();
 void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
                   uint8_t* data);
+void updateTask(void* pvParameters);
 
 void setup() {
   Serial.begin(115200);
@@ -51,6 +59,9 @@ void setup() {
 
   memset(universes_received, 0, max_universe);
   artnet.setArtDmxCallback(on_dmx_frame);
+
+  xTaskCreatePinnedToCore(updateTask, "Update LED Task", 10000, NULL, 1, NULL,
+                          0);
 }
 
 void loop() { artnet.read(); }
@@ -176,6 +187,16 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
   }
 
   uint8_t program_selector = data[start_channel];
+  color_1 = CRGBW(data[offset + 1], data[offset + 2], data[offset + 3],
+                  data[offset + 4]);
+  color_2 = CRGBW(data[offset + 5], data[offset + 6], data[offset + 7],
+                  data[offset + 8]);
+  color_3 = CRGBW(data[offset + 9], data[offset + 10], data[offset + 11],
+                  data[offset + 12]);
+  color_4 = CRGBW(data[offset + 13], data[offset + 14], data[offset + 15],
+                  data[offset + 16]);
+  value_1 = data[offset + 17];
+  value_2 = data[offset + 18];
   Serial.print("Program Selector: ");
   Serial.println(program_selector);
 
@@ -183,31 +204,27 @@ void on_dmx_frame(uint16_t universe, uint16_t length, uint8_t sequence,
       current_program_number != program_selector) {
     if (program_selector >= 0 && program_selector < number_programs) {
       current_program = programs[program_selector];
-      current_program->initialize(matrix_width, matrix_height);
       current_program_number = program_selector;
       Serial.println("Program initialized.");
     } else {
       Serial.println("Invalid program selector, ignoring frame.");
       return;
     }
-  }
-
-  Serial.println("Updating program with new data.");
-
-  if (current_program != nullptr) {
-    CRGBW color_1(data[offset + 1], data[offset + 2], data[offset + 3],
-                  data[offset + 4]);
-    CRGBW color_2(data[offset + 5], data[offset + 6], data[offset + 7],
-                  data[offset + 8]);
-    CRGBW color_3(data[offset + 9], data[offset + 10], data[offset + 11],
-                  data[offset + 12]);
-    CRGBW color_4(data[offset + 13], data[offset + 14], data[offset + 15],
-                  data[offset + 16]);
-    uint8_t value_1 = data[offset + 17];
-    uint8_t value_2 = data[offset + 18];
+  } else {
+    Serial.println("Updating program with new data.");
 
     current_program->update(leds, &color_1, &color_2, &color_3, &color_4,
                             value_1, value_2);
     FastLED.show();
+  }
+}
+
+void updateTask(void* pvParameters) {
+  for (;;) {
+    if (current_program != nullptr) {
+      current_program->update(leds, &color_1, &color_2, &color_3, &color_4,
+                              value_1, value_2);
+    }
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
